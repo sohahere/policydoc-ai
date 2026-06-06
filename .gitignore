@@ -1,0 +1,26 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+
+# Local vector database
+chroma_db/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Streamlit / OS files
+.streamlit/secrets.toml
+.DS_Store
+Thumbs.db
+
+# Keep sample PDFs but ignore random uploads
+data/uploaded_docs/*
+!data/uploaded_docs/.gitkeep
+!data/uploaded_docs/sample.pdf
+!data/uploaded_docs/hard_evaluation.pdf

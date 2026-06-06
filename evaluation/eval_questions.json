@@ -1,0 +1,42 @@
+[
+  {
+    "question": "How many paid time off days are allowed per year?",
+    "expected_page_numbers": [2]
+  },
+  {
+    "question": "How many sick leave days are allowed per year?",
+    "expected_page_numbers": [2]
+  },
+  {
+    "question": "How many remote work days are allowed per week?",
+    "expected_page_numbers": [3]
+  },
+  {
+    "question": "What is the local meal reimbursement limit?",
+    "expected_page_numbers": [4]
+  },
+  {
+    "question": "Who can access restricted documents?",
+    "expected_page_numbers": [5]
+  },
+  {
+    "question": "How long are employee records retained?",
+    "expected_page_numbers": [6]
+  },
+  {
+    "question": "How quickly should a lost laptop or token be reported?",
+    "expected_page_numbers": [7]
+  },
+  {
+    "question": "What should the system do when a policy is missing?",
+    "expected_page_numbers": [7]
+  },
+  {
+    "question": "Why does ingestion quality matter for policy PDFs?",
+    "expected_page_numbers": [8]
+  },
+  {
+    "question": "What evidence should a leave question cite?",
+    "expected_page_numbers": [10]
+  }
+]

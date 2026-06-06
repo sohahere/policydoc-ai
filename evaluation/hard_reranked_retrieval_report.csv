@@ -1,0 +1,9 @@
+question,expected_pages,reranked_pages,reranked_chunk_ids,reranked_content_types,rerank_scores,hit_at_3,reciprocal_rank
+What is the normal lunch reimbursement limit?,[4],"[2, 3, 10]","[6, 8, 31]","['text', 'text', 'table']","[3.4981, 2.6935, 2.5346]",False,0.0
+What is the maximum claim for a client dinner?,[4],"[2, 10, 10]","[6, 31, 29]","['text', 'table', 'text']","[1.4298, 1.252, -0.0146]",False,0.0
+How quickly must a missing security token be reported?,[7],"[10, 10, 8]","[32, 30, 23]","['table', 'text', 'text']","[6.9826, 6.7302, 5.0869]",False,0.0
+Which role can access restricted security records?,[5],"[5, 5, 10]","[14, 15, 29]","['text', 'text', 'text']","[6.008, 3.7441, 1.7371]",True,1.0
+How long should closed security incident records be retained?,[6],"[10, 10, 7]","[32, 30, 21]","['table', 'text', 'text']","[9.1645, 8.1506, 6.51]",False,0.0
+What documents are not reimbursable if missing receipts?,[4],"[9, 2, 7]","[26, 5, 20]","['text', 'text', 'text']","[-1.0298, -2.1481, -2.6206]",False,0.0
+Who approves temporary restricted access?,[5],"[5, 6, 1]","[15, 17, 2]","['text', 'text', 'text']","[6.0227, 5.9643, 1.8287]",True,1.0
+Is there a customer refund policy?,[7],"[9, 9, 10]","[28, 26, 30]","['table', 'text', 'text']","[4.5384, 3.1068, 2.1668]",False,0.0

@@ -1,0 +1,34 @@
+[
+  {
+    "question": "What is the normal lunch reimbursement limit?",
+    "expected_page_numbers": [4]
+  },
+  {
+    "question": "What is the maximum claim for a client dinner?",
+    "expected_page_numbers": [4]
+  },
+  {
+    "question": "How quickly must a missing security token be reported?",
+    "expected_page_numbers": [7]
+  },
+  {
+    "question": "Which role can access restricted security records?",
+    "expected_page_numbers": [5]
+  },
+  {
+    "question": "How long should closed security incident records be retained?",
+    "expected_page_numbers": [6]
+  },
+  {
+    "question": "What documents are not reimbursable if missing receipts?",
+    "expected_page_numbers": [4]
+  },
+  {
+    "question": "Who approves temporary restricted access?",
+    "expected_page_numbers": [5]
+  },
+  {
+    "question": "Is there a customer refund policy?",
+    "expected_page_numbers": [7]
+  }
+]

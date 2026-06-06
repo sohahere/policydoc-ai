@@ -1,0 +1,10 @@
+streamlit
+chromadb
+sentence-transformers
+langchain-core
+langchain-text-splitters
+pdfplumber
+python-dotenv
+openai
+rank-bm25
+transformers
