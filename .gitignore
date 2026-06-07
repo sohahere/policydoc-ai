@@ -24,3 +24,6 @@ data/uploaded_docs/*
 !data/uploaded_docs/.gitkeep
 !data/uploaded_docs/sample.pdf
 !data/uploaded_docs/hard_evaluation.pdf
+
+logs/*
+!logs/.gitkeep
