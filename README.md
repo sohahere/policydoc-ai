@@ -1059,4 +1059,4 @@ PolicyDoc AI is built as a practical, evaluated RAG project for company policy a
 
 The project demonstrates not only how to build a working RAG pipeline, but also how to evaluate retrieval quality, handle tables, provide citations, test failure cases, add lightweight LLMOps-style observability, and reason about production improvements.
 
-This makes it suitable as a portfolio project for fresher AI Engineer / ML Engineer roles.
+
