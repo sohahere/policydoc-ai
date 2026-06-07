@@ -17,6 +17,6 @@ RUN pip install --no-cache-dir -r requirements-docker.txt
 
 COPY . .
 
-EXPOSE 8501
+EXPOSE 7860
 
-CMD ["streamlit", "run", "frontend/streamlit_app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.fileWatcherType=none"]
+CMD ["streamlit", "run", "frontend/streamlit_app.py", "--server.address=0.0.0.0", "--server.port=7860", "--server.fileWatcherType=none"]
