@@ -1,4 +1,5 @@
 import os
+import time
 
 import chromadb
 from dotenv import load_dotenv
@@ -6,40 +7,82 @@ from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 
 from config import (
+    APP_VERSION,
     CHROMA_COLLECTION_NAME,
     CHROMA_DB_PATH,
     EMBEDDING_MODEL_NAME,
     HF_MODEL_NAME,
     LLM_MAX_TOKENS,
     LLM_TEMPERATURE,
+    PROMPT_FILE_PATH,
+    PROMPT_VERSION,
+    RAG_RUN_LOG_PATH,
     TOP_K,
 )
+
+from exceptions import (
+    LLMGenerationError,
+    RetrievalError,
+    VectorStoreError,
+)
+
+from llmops import (
+    build_context_from_sources,
+    load_prompt_template,
+    log_rag_run,
+)
+
+from logger import get_logger
 
 
 load_dotenv()
 
+logger = get_logger(__name__)
+
 
 def get_embedding_model():
+    """
+    Load the sentence-transformer embedding model.
+    """
+    logger.info(f"Loading embedding model: {EMBEDDING_MODEL_NAME}")
     return SentenceTransformer(EMBEDDING_MODEL_NAME)
 
 
 def get_chroma_collection():
-    chroma_client = chromadb.PersistentClient(
-        path=str(CHROMA_DB_PATH)
-    )
+    """
+    Connect to the existing ChromaDB collection.
+    """
+    try:
+        chroma_client = chromadb.PersistentClient(
+            path=str(CHROMA_DB_PATH)
+        )
 
-    collection = chroma_client.get_collection(
-        name=CHROMA_COLLECTION_NAME
-    )
+        collection = chroma_client.get_collection(
+            name=CHROMA_COLLECTION_NAME
+        )
 
-    return collection
+        logger.info(
+            f"Connected to ChromaDB collection: {CHROMA_COLLECTION_NAME}"
+        )
+
+        return collection
+
+    except Exception as error:
+        raise VectorStoreError(
+            f"Failed to connect to ChromaDB collection: {error}"
+        ) from error
 
 
 def get_hf_client():
+    """
+    Create Hugging Face Inference Provider client.
+
+    Hugging Face uses an OpenAI-compatible client interface here.
+    """
     hf_token = os.getenv("HF_TOKEN")
 
     if not hf_token:
-        raise ValueError(
+        raise LLMGenerationError(
             "HF_TOKEN not found. Add it to your .env file."
         )
 
@@ -50,104 +93,137 @@ def get_hf_client():
 
 
 def retrieve_context(question: str, top_k: int = TOP_K):
-    embedding_model = get_embedding_model()
-    collection = get_chroma_collection()
+    """
+    Retrieve top-k relevant chunks from ChromaDB.
+    """
+    try:
+        logger.info(f"Retrieving context for question: {question}")
 
-    query_embedding = embedding_model.encode(question).tolist()
+        embedding_model = get_embedding_model()
+        collection = get_chroma_collection()
 
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=top_k,
-        include=["documents", "metadatas", "distances"],
-    )
+        query_embedding = embedding_model.encode(question).tolist()
 
-    retrieved_chunks = []
-
-    for doc, metadata, distance in zip(
-        results["documents"][0],
-        results["metadatas"][0],
-        results["distances"][0],
-    ):
-        retrieved_chunks.append(
-            {
-                "text": doc,
-                "metadata": metadata,
-                "distance": distance,
-            }
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k,
+            include=["documents", "metadatas", "distances"],
         )
 
-    return retrieved_chunks
+        retrieved_chunks = []
+
+        for doc, metadata, distance in zip(
+            results["documents"][0],
+            results["metadatas"][0],
+            results["distances"][0],
+        ):
+            retrieved_chunks.append(
+                {
+                    "text": doc,
+                    "metadata": metadata,
+                    "distance": distance,
+                }
+            )
+
+        logger.info(f"Retrieved {len(retrieved_chunks)} chunks")
+
+        return retrieved_chunks
+
+    except Exception as error:
+        raise RetrievalError(
+            f"Failed to retrieve context from ChromaDB: {error}"
+        ) from error
 
 
 def build_prompt(question: str, retrieved_chunks: list[dict]) -> str:
-    context_blocks = []
+    """
+    Build prompt using versioned prompt template.
 
-    for i, chunk in enumerate(retrieved_chunks, start=1):
-        metadata = chunk["metadata"]
+    The prompt template is stored separately inside prompts/
+    as a lightweight prompt-versioning practice.
+    """
+    prompt_template = load_prompt_template(PROMPT_FILE_PATH)
 
-        source_label = (
-            f"[Source {i} | "
-            f"file={metadata.get('file_name')} | "
-            f"page={metadata.get('page_number')} | "
-            f"chunk_id={metadata.get('chunk_id')} | "
-            f"content_type={metadata.get('content_type')}]"
-        )
+    context = build_context_from_sources(retrieved_chunks)
 
-        context_blocks.append(
-            source_label + "\n" + chunk["text"]
-        )
+    prompt = prompt_template.format(
+        context=context,
+        question=question,
+    )
 
-    context = "\n\n".join(context_blocks)
+    logger.info(f"Prompt built using version: {PROMPT_VERSION}")
 
-    prompt = f"""
-You are PolicyDoc AI, a RAG assistant for company policy and compliance documents.
-
-Use ONLY the provided context to answer the question.
-
-Rules:
-1. Do not use outside knowledge.
-2. If the answer is not present in the context, say:
-   "I could not find this information in the provided documents."
-3. Keep the answer clear and concise.
-4. Include citations using the exact source labels.
-5. If the answer comes from a table, mention that it comes from table content.
-
-Context:
-{context}
-
-Question:
-{question}
-
-Answer:
-"""
     return prompt
 
 
 def generate_answer(question: str):
-    retrieved_chunks = retrieve_context(question)
+    """
+    Complete RAG answer generation flow.
 
-    prompt = build_prompt(
-        question=question,
-        retrieved_chunks=retrieved_chunks,
-    )
+    Steps:
+    1. Start timer
+    2. Retrieve relevant chunks
+    3. Load versioned prompt template
+    4. Build grounded prompt
+    5. Call Hugging Face LLM
+    6. Log RAG run with latency, prompt version, and retrieved sources
+    7. Return answer and retrieved chunks
+    """
+    start_time = time.time()
 
-    hf_client = get_hf_client()
+    try:
+        retrieved_chunks = retrieve_context(question)
 
-    response = hf_client.chat.completions.create(
-        model=HF_MODEL_NAME,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
-        max_tokens=LLM_MAX_TOKENS,
-        temperature=LLM_TEMPERATURE,
-    )
+        prompt = build_prompt(
+            question=question,
+            retrieved_chunks=retrieved_chunks,
+        )
 
-    answer = response.choices[0].message.content
+        hf_client = get_hf_client()
 
-    return answer, retrieved_chunks
+        logger.info(f"Calling Hugging Face LLM: {HF_MODEL_NAME}")
+
+        response = hf_client.chat.completions.create(
+            model=HF_MODEL_NAME,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            max_tokens=LLM_MAX_TOKENS,
+            temperature=LLM_TEMPERATURE,
+        )
+
+        answer = response.choices[0].message.content
+
+        logger.info("LLM answer generated successfully")
+
+        log_rag_run(
+            log_path=RAG_RUN_LOG_PATH,
+            question=question,
+            answer=answer,
+            retrieved_sources=retrieved_chunks,
+            prompt_version=PROMPT_VERSION,
+            app_version=APP_VERSION,
+            start_time=start_time,
+            extra={
+                "model_name": HF_MODEL_NAME,
+                "top_k": TOP_K,
+                "temperature": LLM_TEMPERATURE,
+                "max_tokens": LLM_MAX_TOKENS,
+            },
+        )
+
+        return answer, retrieved_chunks
+
+    except (RetrievalError, VectorStoreError, LLMGenerationError):
+        raise
+
+    except Exception as error:
+        raise LLMGenerationError(
+            f"Failed to generate answer: {error}"
+        ) from error
 
 
 if __name__ == "__main__":

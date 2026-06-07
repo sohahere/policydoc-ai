@@ -94,3 +94,19 @@ HYBRID_FINAL_K = 3
 
 DENSE_WEIGHT = 0.5
 BM25_WEIGHT = 0.5
+
+# -----------------------------
+# LLMOps / Observability settings
+# -----------------------------
+
+APP_VERSION = "0.1.0"
+
+PROMPT_VERSION = "policy_rag_prompt_v1"
+
+PROMPT_DIR = PROJECT_ROOT / "prompts"
+
+PROMPT_FILE_PATH = PROMPT_DIR / "policy_rag_prompt_v1.txt"
+
+LOG_DIR = PROJECT_ROOT / "logs"
+
+RAG_RUN_LOG_PATH = LOG_DIR / "rag_runs.jsonl"

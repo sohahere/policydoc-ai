@@ -4,7 +4,7 @@
   <img src="assets/policydoc_ai_project_overview_banner.png" alt="PolicyDoc AI Project Banner" width="100%">
 </p>
 
-## Evaluated RAG Assistant for Company Policy & Compliance Documents
+## Evaluated RAG Assistant for Company Policy & Compliance Documents with LLMOps-Lite Observability
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11-blue" />
@@ -14,11 +14,12 @@
   <img src="https://img.shields.io/badge/Hugging%20Face-LLM-yellow" />
   <img src="https://img.shields.io/badge/Docker-Supported-blue" />
   <img src="https://img.shields.io/badge/RAG-Evaluated-success" />
+  <img src="https://img.shields.io/badge/LLMOps--Lite-Observability-orange" />
 </p>
 
 PolicyDoc AI is an end-to-end Retrieval-Augmented Generation system built for company policy and compliance documents. It allows users to upload TXT or PDF policy documents, extract text and tables, convert tables into markdown, store document chunks in ChromaDB, retrieve relevant evidence, and generate grounded answers with source citations.
 
-Unlike a basic “chat with PDF” project, PolicyDoc AI includes table-aware ingestion, evaluated retrieval, hallucination control, Streamlit UI, Docker support, and advanced retrieval experiments.
+Unlike a basic “chat with PDF” project, PolicyDoc AI includes table-aware ingestion, evaluated retrieval, hallucination control, Streamlit UI, Docker support, advanced retrieval experiments, prompt versioning, structured logging, custom exceptions, and lightweight LLMOps-style run tracing.
 
 ---
 
@@ -113,6 +114,10 @@ Since the uploaded document does not contain a customer refund policy, the syste
 | **Streamlit UI** | Provides an interactive interface for uploading documents and asking questions. |
 | **Docker support** | Includes Docker setup for containerized local deployment. |
 | **Advanced retrieval experiments** | Compares dense retrieval, reranking, and hybrid retrieval on a harder benchmark. |
+| **Prompt versioning** | Stores the RAG prompt separately in `prompts/policy_rag_prompt_v1.txt`. |
+| **Structured logging** | Uses a centralized logger for clean timestamped pipeline logs. |
+| **Custom exceptions** | Adds project-specific errors for retrieval, vector store, prompt, and LLM failures. |
+| **LLMOps-lite tracing** | Logs RAG runs with app version, prompt version, latency, estimated tokens, model settings, and retrieved source metadata. |
 
 ---
 
@@ -162,9 +167,13 @@ User asks a question
         ↓
 Top-k retrieval
         ↓
+Load versioned prompt template
+        ↓
 Hugging Face LLM answer generation
         ↓
 Grounded answer with source citations
+        ↓
+LLMOps-lite trace logging
 ```
 
 ### RAG Pipeline Flow
@@ -195,10 +204,40 @@ chunk_length
 ### 2. Query Stage
 
 ```txt
-Question → query embedding → semantic retrieval → LLM answer → citations
+Question → query embedding → semantic retrieval → versioned prompt → LLM answer → citations → run trace
 ```
 
 The final answer is generated only from retrieved context. If the answer is missing from the document, the system returns an insufficient-context response instead of guessing.
+
+### Why an Explicit Modular Pipeline Instead of LCEL Chains?
+
+PolicyDoc AI uses LangChain components such as `Document` objects and `RecursiveCharacterTextSplitter`, but the full RAG flow is implemented as an explicit modular pipeline instead of a compact LCEL chain.
+
+This was intentional.
+
+The project needs visibility into each step:
+
+- document loading
+- PDF table extraction
+- chunk metadata
+- embedding creation
+- ChromaDB storage
+- retrieved chunk IDs
+- distance scores
+- citation metadata
+- evaluation reports
+- prompt versioning
+- LLMOps run logs
+
+A formal chain can reduce code length, but it can also hide intermediate outputs. Since this project focuses on evaluation, debugging, and explainability, the pipeline is kept explicit and modular.
+
+Conceptually, the system is still chained:
+
+```txt
+loader → chunker → embeddings → vector store → retriever → prompt builder → LLM → logger
+```
+
+In a future production version, these same modules could be wrapped into LCEL chains or service classes.
 
 ---
 
@@ -419,6 +458,18 @@ This means no ChromaDB account is required. For production, local ChromaDB can b
 
 After retrieval, the top relevant chunks are passed to a Hugging Face LLM for answer generation.
 
+The RAG prompt is versioned separately from the Python code in:
+
+```txt
+prompts/policy_rag_prompt_v1.txt
+```
+
+This makes prompt changes easier to track and improves reproducibility.
+
+<p align="center">
+  <img src="assets/prompt_versioning.png" alt="Prompt Versioning in PolicyDoc AI" width="90%">
+</p>
+
 The prompt tells the model to:
 
 - use only the retrieved context
@@ -478,6 +529,70 @@ I could not find this information in the provided documents.
 <p align="center">
   <img src="assets/streamlit_negative_answer.png" alt="Negative question handling" width="90%">
 </p>
+
+---
+
+## LLMOps-Inspired Observability
+
+PolicyDoc AI includes a lightweight LLMOps-inspired observability layer to make the RAG system more reproducible, traceable, and easier to debug.
+
+This is not a full production LLMOps platform, but it adds practical tracing and monitoring concepts commonly used in real-world LLM applications.
+
+### What Gets Tracked
+
+| Logged Field | Purpose |
+|---|---|
+| `timestamp_utc` | Tracks when the query was executed |
+| `app_version` | Tracks the application version |
+| `prompt_version` | Tracks which prompt template was used |
+| `question` | Stores the user query for debugging |
+| `answer` | Stores the generated response |
+| `latency_seconds` | Measures end-to-end RAG response time |
+| `estimated_question_tokens` | Approximate question token count |
+| `estimated_answer_tokens` | Approximate answer token count |
+| `retrieved_source_count` | Number of retrieved chunks |
+| `retrieved_sources` | File name, page number, chunk ID, content type, and vector distance |
+| `model_name` | LLM used for answer generation |
+| `top_k` | Number of chunks retrieved |
+| `temperature` | Generation randomness setting |
+| `max_tokens` | Output token limit |
+
+### Example RAG Trace
+
+Each RAG run is logged locally as a JSONL record:
+
+```txt
+logs/rag_runs.jsonl
+```
+
+Example trace:
+
+<p align="center">
+  <img src="assets/llmops_trace_log.png" alt="LLMOps Trace Log Example" width="90%">
+</p>
+
+The actual runtime log file is ignored by Git because logs may contain user questions, generated answers, or sensitive document content.
+
+```gitignore
+logs/*
+!logs/.gitkeep
+```
+
+> Token counts are lightweight estimates for local observability, not exact provider billing tokens. In production, exact token usage would be tracked using provider metadata or tokenizer-level counting.
+
+### Why This Matters
+
+This tracing layer helps answer questions such as:
+
+- Which prompt version generated this answer?
+- Which model and generation settings were used?
+- How long did the RAG response take?
+- Which chunks were retrieved?
+- Did the answer come from text or table content?
+- What source pages supported the answer?
+- How can we debug a wrong or slow response?
+
+In production, this type of information would usually be sent to observability tools such as LangSmith, Langfuse, Helicone, Arize Phoenix, OpenTelemetry-based tracing, or a logging database.
 
 ---
 
@@ -632,6 +747,10 @@ Then open:
 http://localhost:8501
 ```
 
+<p align="center">
+  <img src="assets/docker.png" alt="Docker Running PolicyDoc AI" width="90%">
+</p>
+
 The Docker setup uses Python 3.11 slim, CPU-only PyTorch, Streamlit, ChromaDB, Sentence Transformers, and the Hugging Face token from `.env`.
 
 For production, the local ChromaDB directory should be mounted as a Docker volume or replaced with a managed vector database.
@@ -731,6 +850,9 @@ http://localhost:8501
 | LLM | Hugging Face Inference Provider | Generates final grounded answers |
 | Environment Variables | python-dotenv | Loads Hugging Face token securely |
 | Evaluation | Recall@3 and MRR scripts | Measures retrieval quality |
+| Logging | Python `logging` | Produces timestamped process logs |
+| Error Handling | Custom exception classes | Makes failures easier to debug and explain |
+| LLMOps-lite | JSONL run tracing | Tracks prompt version, latency, estimated tokens, model settings, and retrieved sources |
 | Keyword Retrieval Experiment | rank-bm25 | Tests BM25-based hybrid retrieval |
 | Reranking Experiment | CrossEncoder | Tests query-chunk reranking |
 | Containerization | Docker | Runs the app inside a container |
@@ -741,7 +863,10 @@ http://localhost:8501
 
 | File | Purpose |
 |---|---|
-| `app/config.py` | Stores project paths, model names, chunk settings, retrieval settings, and collection names |
+| `app/config.py` | Stores project paths, model names, chunk settings, retrieval settings, collection names, prompt path, app version, and log paths |
+| `app/logger.py` | Provides centralized timestamped logging for pipeline events |
+| `app/exceptions.py` | Defines custom project-specific exceptions for cleaner debugging |
+| `app/llmops.py` | Loads versioned prompts, builds context, estimates tokens, and logs RAG runs |
 | `app/loaders.py` | Loads TXT/PDF files, extracts PDF text and tables, converts tables to markdown |
 | `app/index_documents.py` | Loads documents, chunks them, creates embeddings, and stores them in ChromaDB |
 | `app/retrieve.py` | Tests retrieval from ChromaDB for a sample query |
@@ -754,6 +879,8 @@ http://localhost:8501
 | `app/evaluate_hard_hybrid.py` | Evaluates dense + BM25 hybrid retrieval on the hard benchmark |
 | `app/debug_candidate_recall.py` | Checks whether correct evidence appears in the wider top-20 candidate pool |
 | `frontend/streamlit_app.py` | Streamlit user interface |
+| `prompts/policy_rag_prompt_v1.txt` | Versioned prompt template for grounded RAG answer generation |
+| `logs/.gitkeep` | Keeps the logs folder in Git while ignoring runtime logs |
 | `evaluation/eval_questions.json` | Clean benchmark questions |
 | `evaluation/hard_eval_questions.json` | Hard benchmark questions |
 | `data/uploaded_docs/sample.pdf` | Clean company-policy sample PDF |
@@ -780,6 +907,15 @@ CHUNK_OVERLAP = 200
 TOP_K = 3
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 CHROMA_COLLECTION_NAME = "policy_documents"
+```
+
+LLMOps-lite configuration:
+
+```python
+APP_VERSION = "0.1.0"
+PROMPT_VERSION = "policy_rag_prompt_v1"
+PROMPT_FILE_PATH = PROMPT_DIR / "policy_rag_prompt_v1.txt"
+RAG_RUN_LOG_PATH = LOG_DIR / "rag_runs.jsonl"
 ```
 
 Hard benchmark settings:
@@ -843,6 +979,8 @@ python app/index_documents.py
 | **Basic table chunking** | Tables are converted to markdown, but row-level table retrieval is not implemented yet. |
 | **No query rewriting** | User queries are passed directly to retrieval without synonym expansion or rewriting. |
 | **No full RAGAS evaluation yet** | Current evaluation uses custom Recall@3 and MRR scripts. |
+| **LLMOps-lite only** | Current tracing is local JSONL-based. Full production LLMOps would require external tracing, dashboards, feedback loops, and alerting. |
+| **Approximate token tracking** | Token counts are lightweight estimates, not exact provider billing values. |
 | **Free LLM dependency** | Hugging Face free-tier inference may have latency or rate-limit issues. |
 
 ---
@@ -862,7 +1000,7 @@ The hard benchmark revealed useful next-step improvements:
 9. FastAPI backend
 10. Managed vector database
 11. User-specific document collections
-12. Monitoring and logging
+12. Production observability dashboard and user feedback loop
 
 ---
 
@@ -878,6 +1016,8 @@ The hard benchmark revealed useful next-step improvements:
 | Retrieval Optimization | dense retrieval, reranking experiment, BM25 hybrid retrieval experiment |
 | UI Development | Streamlit app for upload, indexing, Q&A, and source inspection |
 | Deployment Basics | Dockerfile, `.dockerignore`, environment variable handling |
+| LLMOps-lite | prompt versioning, run tracing, latency logging, estimated token tracking, source trace logging |
+| Software Engineering | modular code, centralized configuration, custom exceptions, structured logging |
 | Production Thinking | hallucination control, limitations analysis, future improvement planning |
 
 ---
@@ -901,9 +1041,15 @@ The hard benchmark revealed useful next-step improvements:
 | Hard benchmark experiment | Complete |
 | Reranking experiment | Complete |
 | Hybrid retrieval experiment | Complete |
+| Prompt versioning | Complete |
+| Structured logging | Complete |
+| Custom exceptions | Complete |
+| LLMOps-lite run tracing | Complete |
+| Latency and estimated token tracking | Complete |
 | OCR support | Future work |
 | RAGAS evaluation | Future work |
 | FastAPI backend | Future work |
+| Full production LLMOps dashboard | Future work |
 
 ---
 
@@ -911,6 +1057,6 @@ The hard benchmark revealed useful next-step improvements:
 
 PolicyDoc AI is built as a practical, evaluated RAG project for company policy and compliance documents.
 
-The project demonstrates not only how to build a working RAG pipeline, but also how to evaluate retrieval quality, handle tables, provide citations, test failure cases, and reason about production improvements.
+The project demonstrates not only how to build a working RAG pipeline, but also how to evaluate retrieval quality, handle tables, provide citations, test failure cases, add lightweight LLMOps-style observability, and reason about production improvements.
 
 This makes it suitable as a portfolio project for fresher AI Engineer / ML Engineer roles.
