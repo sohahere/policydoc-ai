@@ -1,13 +1,4 @@
 
----
-title: PolicyDoc AI
-emoji: 📄
-colorFrom: blue
-colorTo: purple
-sdk: docker
-pinned: false
-license: mit
----
 # PolicyDoc AI
 
 <p align="center">
