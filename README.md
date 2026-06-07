@@ -23,6 +23,7 @@ license: mit
   <img src="https://img.shields.io/badge/Sentence%20Transformers-Embeddings-purple" />
   <img src="https://img.shields.io/badge/Hugging%20Face-LLM-yellow" />
   <img src="https://img.shields.io/badge/Docker-Supported-blue" />
+  <img src="https://img.shields.io/badge/Hugging%20Face%20Spaces-Deployed-orange" />
   <img src="https://img.shields.io/badge/RAG-Evaluated-success" />
   <img src="https://img.shields.io/badge/LLMOps--Lite-Observability-orange" />
 </p>
@@ -30,6 +31,17 @@ license: mit
 PolicyDoc AI is an end-to-end Retrieval-Augmented Generation system built for company policy and compliance documents. It allows users to upload TXT or PDF policy documents, extract text and tables, convert tables into markdown, store document chunks in ChromaDB, retrieve relevant evidence, and generate grounded answers with source citations.
 
 Unlike a basic “chat with PDF” project, PolicyDoc AI includes table-aware ingestion, evaluated retrieval, hallucination control, Streamlit UI, Docker support, advanced retrieval experiments, prompt versioning, structured logging, custom exceptions, and lightweight LLMOps-style run tracing.
+
+---
+
+## Live Demo & Deployment
+
+- **Live Hugging Face Spaces App:** https://huggingface.co/spaces/sohahere/policydoc-ai
+- **Direct App URL:** https://sohahere-policydoc-ai.hf.space
+- **GitHub Repository:** https://github.com/sohahere/policydoc-ai
+- **Deployment Type:** Docker-based Hugging Face Space running a Streamlit RAG application on port `7860`
+
+> Note: The deployed app requires `HF_TOKEN` to be configured as a Hugging Face Space secret. Locally, the same token should be stored in a `.env` file.
 
 ---
 
@@ -123,6 +135,7 @@ Since the uploaded document does not contain a customer refund policy, the syste
 | **Negative-question handling** | Returns an insufficient-context response when the answer is not present. |
 | **Streamlit UI** | Provides an interactive interface for uploading documents and asking questions. |
 | **Docker support** | Includes Docker setup for containerized local deployment. |
+| **Hugging Face Spaces deployment** | Publicly deployed as a Docker-based Streamlit app with secure secret-based `HF_TOKEN` handling. |
 | **Advanced retrieval experiments** | Compares dense retrieval, reranking, and hybrid retrieval on a harder benchmark. |
 | **Prompt versioning** | Stores the RAG prompt separately in `prompts/policy_rag_prompt_v1.txt`. |
 | **Structured logging** | Uses a centralized logger for clean timestamped pipeline logs. |
@@ -142,7 +155,7 @@ Since the uploaded document does not contain a customer refund policy, the syste
 | May hallucinate missing answers | Handles missing-policy questions safely |
 | Often has no citations | Provides metadata-based source citations |
 | Usually has no failure analysis | Includes hard benchmark and retrieval experiments |
-| Demo only | Streamlit UI + Docker support |
+| Demo only | Streamlit UI + Docker + public Hugging Face Spaces deployment |
 
 ---
 
@@ -731,13 +744,23 @@ The Streamlit UI supports:
 - viewing retrieved sources
 - inspecting page number, chunk ID, content type, and distance score
 
+The same Streamlit interface is deployed publicly on Hugging Face Spaces:
+
+```txt
+https://sohahere-policydoc-ai.hf.space
+```
+
 <p align="center">
   <img src="assets/streamlit_upload_index.png" alt="Streamlit Upload and Index" width="90%">
 </p>
 
 ---
 
-## Docker Support
+## Docker and Hugging Face Spaces Deployment
+
+The project is containerized so that the same RAG application can run locally or on a cloud-hosted demo environment.
+
+### Local Docker Run
 
 Build the Docker image:
 
@@ -745,29 +768,47 @@ Build the Docker image:
 docker build -t policydoc-ai .
 ```
 
-Run the Docker container:
+Run the Docker container locally:
 
 ```bash
-docker run -p 8501:8501 --env-file .env policydoc-ai
+docker run -p 7860:7860 --env-file .env policydoc-ai
 ```
 
 Then open:
 
 ```txt
-http://localhost:8501
+http://localhost:7860
 ```
 
 <p align="center">
   <img src="assets/docker.png" alt="Docker Running PolicyDoc AI" width="90%">
 </p>
 
-The Docker setup uses Python 3.11 slim, CPU-only PyTorch, Streamlit, ChromaDB, Sentence Transformers, and the Hugging Face token from `.env`.
+### Hugging Face Spaces Deployment
 
-For production, the local ChromaDB directory should be mounted as a Docker volume or replaced with a managed vector database.
+The app is deployed publicly as a Docker-based Hugging Face Space:
+
+```txt
+https://huggingface.co/spaces/sohahere/policydoc-ai
+```
+
+Direct app URL:
+
+```txt
+https://sohahere-policydoc-ai.hf.space
+```
+
+For Hugging Face Spaces, the Docker container exposes port `7860`, and the app starts with:
 
 ```bash
-docker run -p 8501:8501 --env-file .env -v chroma_data:/app/chroma_db policydoc-ai
+streamlit run frontend/streamlit_app.py --server.address=0.0.0.0 --server.port=7860
 ```
+
+The `HF_TOKEN` is stored as a Hugging Face Space secret instead of being committed to the repository.
+
+### Storage Note
+
+The current deployment uses local ChromaDB inside the running container. This is suitable for a demo, but for production the vector database should be persisted using a mounted volume or replaced with a managed vector database.
 
 ---
 
@@ -844,6 +885,12 @@ Open:
 http://localhost:8501
 ```
 
+Or use the deployed Hugging Face Spaces version:
+
+```txt
+https://sohahere-policydoc-ai.hf.space
+```
+
 ---
 
 ## Tech Stack
@@ -866,6 +913,7 @@ http://localhost:8501
 | Keyword Retrieval Experiment | rank-bm25 | Tests BM25-based hybrid retrieval |
 | Reranking Experiment | CrossEncoder | Tests query-chunk reranking |
 | Containerization | Docker | Runs the app inside a container |
+| Cloud Demo Deployment | Hugging Face Spaces | Hosts the Dockerized Streamlit RAG app publicly with secret-based token handling |
 
 ---
 
@@ -895,7 +943,7 @@ http://localhost:8501
 | `evaluation/hard_eval_questions.json` | Hard benchmark questions |
 | `data/uploaded_docs/sample.pdf` | Clean company-policy sample PDF |
 | `data/uploaded_docs/hard_evaluation.pdf` | Hard retrieval benchmark PDF |
-| `Dockerfile` | Docker container definition |
+| `Dockerfile` | Docker container definition for local and Hugging Face Spaces deployment |
 | `requirements.txt` | Local Python dependencies |
 | `requirements-docker.txt` | Docker-specific dependencies |
 
@@ -953,6 +1001,8 @@ The Hugging Face token is used for LLM answer generation.
 
 Do not push `.env` to GitHub.
 
+For the deployed Hugging Face Space, `HF_TOKEN` is added through **Settings → Variables and secrets → New secret**.
+
 ---
 
 ## Local ChromaDB Storage
@@ -983,8 +1033,8 @@ python app/index_documents.py
 |---|---|
 | **No OCR support** | Scanned PDFs and image-only documents are not processed in the current version. |
 | **No DOCX support** | Current version supports TXT and PDF only. |
-| **Single-user demo design** | The Streamlit app is designed for local demo usage, not multi-user production. |
-| **Local ChromaDB** | Vector storage is local. For production, a managed vector database or mounted Docker volume would be better. |
+| **Single-user demo design** | The Streamlit app is deployed as a public demo, but it is not designed for authenticated multi-user production usage. |
+| **Local ChromaDB** | Vector storage is local/ephemeral in the demo container. For production, a managed vector database or mounted Docker volume would be better. |
 | **No authentication** | The app does not include login or user-level document isolation. |
 | **Basic table chunking** | Tables are converted to markdown, but row-level table retrieval is not implemented yet. |
 | **No query rewriting** | User queries are passed directly to retrieval without synonym expansion or rewriting. |
@@ -1009,8 +1059,9 @@ The hard benchmark revealed useful next-step improvements:
 8. RAGAS evaluation
 9. FastAPI backend
 10. Managed vector database
-11. User-specific document collections
-12. Production observability dashboard and user feedback loop
+11. Persistent cloud storage for uploaded documents and vector indexes
+12. User-specific document collections
+13. Production observability dashboard and user feedback loop
 
 ---
 
@@ -1025,7 +1076,7 @@ The hard benchmark revealed useful next-step improvements:
 | Evaluation | Recall@3, MRR, clean benchmark, hard benchmark, candidate recall analysis |
 | Retrieval Optimization | dense retrieval, reranking experiment, BM25 hybrid retrieval experiment |
 | UI Development | Streamlit app for upload, indexing, Q&A, and source inspection |
-| Deployment Basics | Dockerfile, `.dockerignore`, environment variable handling |
+| Deployment Basics | Dockerfile, `.dockerignore`, Hugging Face Spaces deployment, environment variable and secret handling |
 | LLMOps-lite | prompt versioning, run tracing, latency logging, estimated token tracking, source trace logging |
 | Software Engineering | modular code, centralized configuration, custom exceptions, structured logging |
 | Production Thinking | hallucination control, limitations analysis, future improvement planning |
@@ -1048,6 +1099,7 @@ The hard benchmark revealed useful next-step improvements:
 | Retrieval evaluation | Complete |
 | Streamlit UI | Complete |
 | Docker support | Complete |
+| Hugging Face Spaces deployment | Complete |
 | Hard benchmark experiment | Complete |
 | Reranking experiment | Complete |
 | Hybrid retrieval experiment | Complete |
@@ -1065,7 +1117,7 @@ The hard benchmark revealed useful next-step improvements:
 
 ## Final Note
 
-PolicyDoc AI is built as a practical, evaluated RAG project for company policy and compliance documents.
+PolicyDoc AI is built as a practical, evaluated, and publicly deployed RAG project for company policy and compliance documents.
 
 The project demonstrates not only how to build a working RAG pipeline, but also how to evaluate retrieval quality, handle tables, provide citations, test failure cases, add lightweight LLMOps-style observability, and reason about production improvements.
 
